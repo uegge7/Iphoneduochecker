@@ -8,6 +8,7 @@ in einem dieser Apple Stores **zur Abholung** verfügbar ist, und schickt dann e
 | Süddeutschland | München Rosenstraße, München OEZ, Augsburg City-Galerie, Sindelfingen |
 | Zürich | Rennweg, Glattzentrum |
 | Österreich | Wien Kärntner Straße |
+| epos Vorarlberg (Apple Premium Partner) | Bürs Zimbapark, Götzis Garnmarkt, Dornbirn Messepark |
 
 Das Tool läuft komplett auf **GitHub Actions**. Es muss kein PC laufen.
 
@@ -24,6 +25,7 @@ Das Tool läuft komplett auf **GitHub Actions**. Es muss kein PC laufen.
 - Der Workflow startet ab dem 23.10. alle 5 Minuten und prüft darin 5x im Abstand von ca. 1 Minute.
 - Die Teilenummern pro Land liest das Tool selbst von `apple.com/<land>/shop/buy-iphone/iphone-duo` aus.
 - Für die Abholung fragt es `apple.com/<land>/shop/retail/pickup-message?pl=true&parts.N=…&location=<PLZ>` ab.
+- Für epos fragt es die Shopify-Storefront-API des Shops nach dem Filialbestand. Den öffentlichen Zugangsschlüssel liest es dabei von der Produktseite. Gemeldet wird nur **echter Bestand** (Stückzahl > 0), nicht „bestellbar, Abholung in 2–4 Tagen“.
 - Pro Store und Variante kommt nur eine Push. Gemeldete Treffer merkt es sich in `state.json` im Actions-Cache.
 
 GitHub startet zeitgesteuerte Workflows bei hoher Last teils mit einigen Minuten Verspätung.

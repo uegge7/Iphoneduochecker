@@ -22,6 +22,7 @@ import re
 import smtplib
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from datetime import datetime
@@ -142,6 +143,97 @@ def check_region(region, part_labels):
 
 
 # --------------------------------------------------------------------------
+# Shopify-Händler (z. B. epos Vorarlberg): Filialbestand über die Storefront-API
+# --------------------------------------------------------------------------
+
+SHOPIFY_API_VERSION = "2025-01"
+SHOPIFY_QUERY_FIELDS = """title variants(first: 1) { nodes { sku storeAvailability(first: 20) {
+  nodes { available pickUpTime quantityAvailable location { name address { city } } } } } }"""
+_shopify_tokens = {}
+
+
+def shopify_handle(region, part):
+    template = region.get("handle_template", "iphone-duo-{part}")
+    return template.format(part=part.lower().replace("/", "-"))
+
+
+def shopify_token(base_url, handle, refresh=False):
+    """Öffentlicher Storefront-Token, den der Shop selbst in jede Produktseite einbettet."""
+    if refresh or base_url not in _shopify_tokens:
+        html = http_get(f"{base_url}/products/{handle}", accept="text/html")
+        m = re.search(r'data-storefront-api-access-token="([0-9a-f]+)"', html)
+        if not m:
+            raise RuntimeError("Storefront-Token nicht auf der Produktseite gefunden")
+        _shopify_tokens[base_url] = m.group(1)
+    return _shopify_tokens[base_url]
+
+
+def shopify_query(parts, region):
+    aliases = {f"p{i}": part for i, part in enumerate(parts)}
+    body = " ".join(
+        f'{a}: product(handle: "{shopify_handle(region, part)}") {{ {SHOPIFY_QUERY_FIELDS} }}'
+        for a, part in aliases.items()
+    )
+    return "{ " + body + " }", aliases
+
+
+def parse_shopify(data, aliases, store_filter=None):
+    """Treffer nur bei echtem Filialbestand (quantityAvailable > 0).
+
+    available=true allein heißt bei epos nur "bestellbar, Abholung in 2-4 Tagen".
+    """
+    result = []
+    for alias, product in (data.get("data") or {}).items():
+        if not product:
+            continue
+        for variant in product["variants"]["nodes"]:
+            for sa in variant["storeAvailability"]["nodes"]:
+                loc = sa["location"]
+                store = {"storeName": loc["name"], "city": (loc.get("address") or {}).get("city", "")}
+                if not store_matches(store, store_filter):
+                    continue
+                qty = sa.get("quantityAvailable") or 0
+                in_stock = bool(sa.get("available")) and qty > 0
+                quote = f"{qty} Stück vor Ort" if in_stock else "kein Filialbestand"
+                result.append((store["storeName"], store["city"], aliases[alias], in_stock, quote))
+    return result
+
+
+def check_shopify(region, part_labels):
+    base = region["base_url"].rstrip("/")
+    query, aliases = shopify_query(list(part_labels), region)
+    first_handle = shopify_handle(region, next(iter(part_labels)))
+    for attempt in (1, 2):
+        req = urllib.request.Request(
+            f"{base}/api/{SHOPIFY_API_VERSION}/graphql.json",
+            data=json.dumps({"query": query}).encode(),
+            headers={
+                "User-Agent": USER_AGENT,
+                "Content-Type": "application/json",
+                "X-Shopify-Storefront-Access-Token": shopify_token(base, first_handle, refresh=attempt > 1),
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=20) as resp:
+                data = json.loads(resp.read())
+            break
+        except urllib.error.HTTPError as e:
+            if e.code in (401, 403) and attempt == 1:
+                continue  # Token evtl. erneuert -> neu von der Seite lesen
+            raise
+    missing = [aliases[a] for a, p in (data.get("data") or {}).items() if not p]
+    if missing:
+        log(f"{region['name']}: Produkte nicht gefunden: {', '.join(missing)}")
+    return parse_shopify(data, aliases, region.get("store_filter"))
+
+
+def product_link(cfg, region, part):
+    if region.get("type") == "shopify":
+        return f"{region['base_url'].rstrip('/')}/products/{shopify_handle(region, part)}"
+    return f"{BASE}/{region['storefront']}/shop/buy-iphone/{cfg['product_slug']}"
+
+
+# --------------------------------------------------------------------------
 # Benachrichtigung
 # --------------------------------------------------------------------------
 
@@ -194,7 +286,13 @@ def notify(title, message):
 # Hauptschleife
 # --------------------------------------------------------------------------
 
-def resolve_parts(cfg, region):
+def resolve_parts(cfg, region, part_map=None):
+    if region.get("parts_from"):
+        # Händler mit denselben Apple-Teilenummern wie eine Apple-Region (z. B. epos = AT-Nummern)
+        parts = (part_map or {}).get(region["parts_from"])
+        if not parts:
+            raise RuntimeError(f"Region '{region['parts_from']}' liefert keine Teilenummern")
+        return dict(parts)
     if region.get("parts"):
         return {p: p for p in region["parts"]}
     parts = discover_parts(region["storefront"], cfg["product_slug"], cfg["capacities"])
@@ -222,9 +320,10 @@ def save_state(path, keys):
 def run(cfg, loops=0, state_path=None):
     """loops=0 läuft endlos; state_path merkt sich gemeldete Treffer über Neustarts hinweg."""
     part_map = {}
-    for region in cfg["regions"]:
+    # Apple-Regionen zuerst, damit Händler mit "parts_from" deren Teilenummern übernehmen können
+    for region in sorted(cfg["regions"], key=lambda r: bool(r.get("parts_from"))):
         try:
-            part_map[region["name"]] = resolve_parts(cfg, region)
+            part_map[region["name"]] = resolve_parts(cfg, region, part_map)
             log(f"{region['name']}: {len(part_map[region['name']])} Varianten -> "
                 + ", ".join(f"{p} ({l})" for p, l in part_map[region['name']].items()))
         except Exception as e:  # noqa: BLE001
@@ -240,7 +339,10 @@ def run(cfg, loops=0, state_path=None):
             if not labels:
                 continue
             try:
-                rows = check_region(region, labels)
+                if region.get("type") == "shopify":
+                    rows = check_shopify(region, labels)
+                else:
+                    rows = check_region(region, labels)
             except Exception as e:  # noqa: BLE001
                 log(f"{region['name']}: Abfrage fehlgeschlagen ({e})")
                 continue
@@ -255,7 +357,7 @@ def run(cfg, loops=0, state_path=None):
                     notify(
                         "iPhone Duo abholbereit!",
                         f"{labels.get(part, part)} in {store} ({city}) – {quote}\n"
-                        f"{BASE}/{region['storefront']}/shop/buy-iphone/{cfg['product_slug']}",
+                        f"{product_link(cfg, region, part)}",
                     )
         previously_available = now_available
         save_state(state_path, now_available)

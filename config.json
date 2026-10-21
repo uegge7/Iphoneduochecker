@@ -41,6 +41,18 @@
       ],
       "max_distance_km": 500,
       "parts": []
+    },
+    {
+      "name": "epos Vorarlberg",
+      "type": "shopify",
+      "base_url": "https://eposcomputer.com",
+      "parts_from": "Österreich",
+      "handle_template": "iphone-duo-{part}",
+      "store_filter": [
+        "Bürs",
+        "Götzis",
+        "Dornbirn"
+      ]
     }
   ]
 }
