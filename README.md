@@ -21,7 +21,7 @@ Das Tool läuft komplett auf **GitHub Actions**. Es muss kein PC laufen.
 
 ## So funktioniert es
 
-- Der Workflow startet alle 5 Minuten und prüft darin 5x im Abstand von ca. 1 Minute.
+- Der Workflow startet ab dem 23.10. alle 5 Minuten und prüft darin 5x im Abstand von ca. 1 Minute.
 - Die Teilenummern pro Land liest das Tool selbst von `apple.com/<land>/shop/buy-iphone/iphone-duo` aus.
 - Für die Abholung fragt es `apple.com/<land>/shop/retail/pickup-message?pl=true&parts.N=…&location=<PLZ>` ab.
 - Pro Store und Variante kommt nur eine Push. Gemeldete Treffer merkt es sich in `state.json` im Actions-Cache.
