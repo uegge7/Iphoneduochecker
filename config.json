@@ -1,0 +1,46 @@
+{
+  "product_slug": "iphone-duo",
+  "capacities": [
+    "256gb",
+    "512gb"
+  ],
+  "interval_seconds": 60,
+  "regions": [
+    {
+      "name": "Süddeutschland",
+      "storefront": "de",
+      "locations": [
+        "80331",
+        "71065"
+      ],
+      "parts": [],
+      "store_filter": [
+        "München",
+        "Augsburg",
+        "Sindelfingen",
+        "Rosenstraße",
+        "Olympia",
+        "OEZ",
+        "Breuningerland"
+      ]
+    },
+    {
+      "name": "Zürich",
+      "storefront": "ch-de",
+      "locations": [
+        "8001"
+      ],
+      "max_distance_km": 40,
+      "parts": []
+    },
+    {
+      "name": "Österreich",
+      "storefront": "at",
+      "locations": [
+        "1010"
+      ],
+      "max_distance_km": 500,
+      "parts": []
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+name: iPhone Duo Abhol-Check
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # alle 5 Minuten starten
+  workflow_dispatch:         # manuell über "Run workflow" startbar
+
+concurrency:
+  group: iphone-duo-check
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      # Merkt sich bereits gemeldete Treffer, damit nicht alle 5 Minuten erneut gepusht wird
+      - name: Status laden
+        uses: actions/cache/restore@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
+          restore-keys: state-
+
+      - name: 5x im Minutentakt prüfen
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 checker.py --loops 5 --state state.json
+
+      - name: Status speichern
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: state.json
+          key: state-${{ github.run_id }}
+
+  test:
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: python3 -m unittest discover -s tests -v
