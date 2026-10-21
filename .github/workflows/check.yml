@@ -4,6 +4,11 @@ on:
   schedule:
     - cron: "*/5 * * * *"   # alle 5 Minuten starten
   workflow_dispatch:         # manuell über "Run workflow" startbar
+    inputs:
+      test_push:
+        description: "Nur Test-Push aufs Handy senden"
+        type: boolean
+        default: false
 
 concurrency:
   group: iphone-duo-check
@@ -24,7 +29,14 @@ jobs:
           key: state-${{ github.run_id }}
           restore-keys: state-
 
+      - name: Test-Push senden
+        if: inputs.test_push
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: python3 checker.py --test-notify
+
       - name: 5x im Minutentakt prüfen
+        if: ${{ !inputs.test_push }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 checker.py --loops 5 --state state.json
