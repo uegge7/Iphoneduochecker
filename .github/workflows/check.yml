@@ -42,7 +42,7 @@ jobs:
         run: python3 checker.py --loops 5 --state state.json
 
       - name: Status speichern
-        if: always()
+        if: ${{ always() && hashFiles('state.json') != '' }}
         uses: actions/cache/save@v4
         with:
           path: state.json
