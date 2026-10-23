@@ -14,7 +14,8 @@ on:
         default: false
 
 concurrency:
-  group: iphone-duo-check
+  # Test-Push läuft separat, damit sie nicht hinter einem 5,5-h-Lauf warten muss
+  group: iphone-duo-check${{ inputs.test_push && '-test' || '' }}
   cancel-in-progress: false
 
 permissions:
