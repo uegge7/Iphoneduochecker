@@ -2,7 +2,8 @@ name: iPhone Duo Abhol-Check
 
 on:
   schedule:
-    # alle 5 Minuten, aber erst ab 23.10. (vorher zeigt Apple keine Abhol-Infos)
+    # GitHub startet Zeitpläne oft nur alle paar Stunden. Darum prüft jeder Lauf bis zu ~5,5 h
+    # lang minütlich; die häufigen Starts sorgen nur dafür, dass direkt danach der nächste Lauf folgt.
     - cron: "*/5 * 23-31 10 *"
     - cron: "*/5 * * 1-9,11-12 *"
   workflow_dispatch:         # manuell über "Run workflow" startbar
@@ -19,7 +20,7 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 355  # GitHub erlaubt max. 6 h pro Job
     steps:
       - uses: actions/checkout@v4
 
@@ -37,11 +38,11 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 checker.py --test-notify
 
-      - name: 5x im Minutentakt prüfen
+      - name: Minütlich prüfen (bis ~5,5 h)
         if: ${{ !inputs.test_push }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python3 checker.py --loops 5 --state state.json
+        run: python3 checker.py --loops 300 --state state.json
 
       - name: Status speichern
         if: ${{ always() && hashFiles('state.json') != '' }}
