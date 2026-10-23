@@ -81,6 +81,20 @@ class CheckerTest(unittest.TestCase):
                                       {"Österreich": {"MK2D4ZD/A": "256GB starwhite"}})
         self.assertEqual(parts, {"MK2D4ZD/A": "256GB starwhite"})
 
+    def test_ntfy_headers_with_link(self):
+        h = checker.ntfy_headers("Titel", "https://eposcomputer.com/products/x")
+        self.assertEqual(h["Click"], "https://eposcomputer.com/products/x")
+        self.assertEqual(h["Actions"], "view, Zur Seite, https://eposcomputer.com/products/x")
+        self.assertNotIn("Click", checker.ntfy_headers("Titel"))
+
+    def test_product_links(self):
+        cfg = {"product_slug": "iphone-duo"}
+        self.assertEqual(checker.product_link(cfg, {"storefront": "ch-de"}, "MK2D4QL/A"),
+                         "https://www.apple.com/ch-de/shop/buy-iphone/iphone-duo")
+        epos = {"type": "shopify", "base_url": "https://eposcomputer.com", "handle_template": "iphone-duo-{part}"}
+        self.assertEqual(checker.product_link(cfg, epos, "MK2G4ZD/A"),
+                         "https://eposcomputer.com/products/iphone-duo-mk2g4zd-a")
+
 
 if __name__ == "__main__":
     unittest.main()

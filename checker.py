@@ -256,7 +256,15 @@ def send_email(title, message):
         log(f"E-Mail fehlgeschlagen: {e}")
 
 
-def notify(title, message):
+def ntfy_headers(title, url=None):
+    headers = {"Title": title.encode("utf-8"), "Priority": "high", "Tags": "iphone"}
+    if url:
+        headers["Click"] = url                          # Tippen auf die Push öffnet die Seite
+        headers["Actions"] = f"view, Zur Seite, {url}"  # zusätzlicher Button in der Push
+    return headers
+
+
+def notify(title, message, url=None):
     log(f"*** {title}: {message}")
     print("\a", end="", flush=True)  # Terminal-Piepton
     send_email(title, message)
@@ -266,7 +274,7 @@ def notify(title, message):
             req = urllib.request.Request(
                 f"https://ntfy.sh/{topic}",
                 data=message.encode("utf-8"),
-                headers={"Title": title.encode("utf-8"), "Priority": "high", "Tags": "iphone"},
+                headers=ntfy_headers(title, url),
             )
             urllib.request.urlopen(req, timeout=10).read()
         except Exception as e:  # noqa: BLE001
@@ -355,10 +363,11 @@ def run(cfg, loops=0, state_path=None, interval=None):
                 key = (region["name"], store, part)
                 now_available.add(key)
                 if key not in previously_available:
+                    link = product_link(cfg, region, part)
                     notify(
                         "iPhone Duo abholbereit!",
-                        f"{labels.get(part, part)} in {store} ({city}) – {quote}\n"
-                        f"{product_link(cfg, region, part)}",
+                        f"{labels.get(part, part)} in {store} ({city}) – {quote}\n{link}",
+                        url=link,
                     )
         previously_available = now_available
         save_state(state_path, now_available)
@@ -380,7 +389,8 @@ def main():
     with open(args.config, encoding="utf-8") as f:
         cfg = json.load(f)
     if args.test_notify:
-        notify("iPhone Duo Checker", "Test-Benachrichtigung funktioniert ✅")
+        notify("iPhone Duo Checker", "Test-Benachrichtigung funktioniert ✅ – Tippen öffnet die epos-Seite",
+               url="https://eposcomputer.com/products/iphone-duo-mk2g4zd-a")
         return
     try:
         run(cfg, loops=1 if args.once else args.loops, state_path=args.state, interval=args.interval)
