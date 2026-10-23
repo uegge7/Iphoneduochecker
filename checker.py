@@ -317,7 +317,7 @@ def save_state(path, keys):
             json.dump(sorted(keys), f, ensure_ascii=False)
 
 
-def run(cfg, loops=0, state_path=None):
+def run(cfg, loops=0, state_path=None, interval=None):
     """loops=0 läuft endlos; state_path merkt sich gemeldete Treffer über Neustarts hinweg."""
     part_map = {}
     # Apple-Regionen zuerst, damit Händler mit "parts_from" deren Teilenummern übernehmen können
@@ -329,6 +329,7 @@ def run(cfg, loops=0, state_path=None):
         except Exception as e:  # noqa: BLE001
             log(f"FEHLER {region['name']}: {e}")
 
+    interval = interval or cfg.get("interval_seconds", 60)
     previously_available = load_state(state_path)
     round_no = 0
     while True:
@@ -363,7 +364,7 @@ def run(cfg, loops=0, state_path=None):
         save_state(state_path, now_available)
         if loops and round_no >= loops:
             return
-        time.sleep(cfg.get("interval_seconds", 60) + random.uniform(0, 10))
+        time.sleep(interval + random.uniform(0, 10))
 
 
 def main():
@@ -371,6 +372,7 @@ def main():
     ap.add_argument("--config", default=os.path.join(os.path.dirname(__file__), "config.json"))
     ap.add_argument("--once", action="store_true", help="nur einmal prüfen und beenden")
     ap.add_argument("--loops", type=int, default=0, help="Anzahl Prüfungen, dann beenden (0 = endlos)")
+    ap.add_argument("--interval", type=int, help="Sekunden zwischen den Prüfungen (Standard aus config.json)")
     ap.add_argument("--state", help="Datei, die bereits gemeldete Treffer speichert")
     ap.add_argument("--test-notify", action="store_true", help="Test-Benachrichtigung senden")
     args = ap.parse_args()
@@ -381,7 +383,7 @@ def main():
         notify("iPhone Duo Checker", "Test-Benachrichtigung funktioniert ✅")
         return
     try:
-        run(cfg, loops=1 if args.once else args.loops, state_path=args.state)
+        run(cfg, loops=1 if args.once else args.loops, state_path=args.state, interval=args.interval)
     except KeyboardInterrupt:
         log("Beendet.")
         sys.exit(0)

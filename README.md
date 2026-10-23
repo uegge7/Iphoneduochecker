@@ -22,7 +22,7 @@ Das Tool läuft komplett auf **GitHub Actions**. Es muss kein PC laufen.
 
 ## So funktioniert es
 
-- Der Workflow läuft ab dem 23.10. und prüft in jedem Lauf bis zu ~5,5 Stunden lang ca. jede Minute. GitHub startet Zeitpläne bei Last nur alle paar Stunden; der nächste Lauf wartet in der Warteschlange und übernimmt direkt.
+- Der Workflow prüft alle 5 Minuten, endlos, bis er deaktiviert wird. Ein GitHub-Lauf darf max. 6 h dauern; darum läuft jeder ~5,5 h und startet am Ende selbst den nächsten. Der Zeitplan (`schedule`) dient nur als Reserve, falls die Kette einmal abreißt.
 - Die Teilenummern pro Land liest das Tool selbst von `apple.com/<land>/shop/buy-iphone/iphone-duo` aus.
 - Für die Abholung fragt es `apple.com/<land>/shop/retail/pickup-message?pl=true&parts.N=…&location=<PLZ>` ab.
 - Für epos fragt es die Shopify-Storefront-API des Shops nach dem Filialbestand. Den öffentlichen Zugangsschlüssel liest es dabei von der Produktseite. Gemeldet wird nur **echter Bestand** (Stückzahl > 0), nicht „bestellbar, Abholung in 2–4 Tagen“.

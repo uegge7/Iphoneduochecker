@@ -2,8 +2,8 @@ name: iPhone Duo Abhol-Check
 
 on:
   schedule:
-    # GitHub startet Zeitpläne oft nur alle paar Stunden. Darum prüft jeder Lauf bis zu ~5,5 h
-    # lang minütlich; die häufigen Starts sorgen nur dafür, dass direkt danach der nächste Lauf folgt.
+    # Reserve: GitHub startet Zeitpläne oft nur alle paar Stunden. Die Hauptkette läuft über den
+    # Selbst-Neustart am Ende jedes Laufs (siehe "Nächsten Lauf starten").
     - cron: "*/5 * 23-31 10 *"
     - cron: "*/5 * * 1-9,11-12 *"
   workflow_dispatch:         # manuell über "Run workflow" startbar
@@ -16,6 +16,10 @@ on:
 concurrency:
   group: iphone-duo-check
   cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: write   # damit sich der Workflow selbst neu starten kann
 
 jobs:
   check:
@@ -38,11 +42,11 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: python3 checker.py --test-notify
 
-      - name: Minütlich prüfen (bis ~5,5 h)
+      - name: Alle 5 Minuten prüfen (~5,5 h pro Lauf)
         if: ${{ !inputs.test_push }}
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
-        run: python3 checker.py --loops 300 --state state.json
+        run: python3 checker.py --loops 66 --interval 300 --state state.json
 
       - name: Status speichern
         if: ${{ always() && hashFiles('state.json') != '' }}
@@ -50,6 +54,14 @@ jobs:
         with:
           path: state.json
           key: state-${{ github.run_id }}
+
+      # Ein Lauf darf max. 6 h dauern -> am Ende den nächsten starten. Endet erst, wenn der
+      # Workflow deaktiviert oder ein Lauf von Hand abgebrochen wird.
+      - name: Nächsten Lauf starten
+        if: ${{ !cancelled() && !inputs.test_push }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run check.yml --repo "$GITHUB_REPOSITORY" --ref main
 
   test:
     if: github.event_name == 'workflow_dispatch'
