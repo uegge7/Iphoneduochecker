@@ -1,0 +1,20 @@
+name: Checker deaktivieren
+on:
+  push:
+    branches: [stop-checker]
+permissions:
+  actions: write
+jobs:
+  stop:
+    runs-on: ubuntu-latest
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          R: ${{ github.repository }}
+        run: |
+          gh workflow disable check.yml --repo "$R" || echo "bereits deaktiviert"
+          for id in $(gh run list --repo "$R" --workflow check.yml --json databaseId,status \
+                        -q '.[] | select(.status != "completed") | .databaseId'); do
+            echo "breche Lauf $id ab"; gh run cancel "$id" --repo "$R" || true
+          done
+          gh workflow list --all --repo "$R"
